@@ -5,7 +5,7 @@
 ## 실행 준비
 
 ```bash
-cd ~/Documents/Lecture_FastAPI/04_fastapi
+cd ~/Documents/Lecture_FastAPI/FastAPI-Lecture/04_fastapi
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
