@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/ideas.db
+    volumes:
+      - idea-data:/data
+    restart: unless-stopped
+
+volumes:
+  idea-data:
