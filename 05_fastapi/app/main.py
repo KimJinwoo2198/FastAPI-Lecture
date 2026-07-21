@@ -1,6 +1,19 @@
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.database import Base, engine, get_db
+from app.models import Idea
+from app.schemas import (
+    IdeaCreate,
+    IdeaResponse,
+    IdeaUpdate,
+    IdeaResponse,
+)
+
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 
 from app.schemas import IdeaCreate, IdeaResponse, IdeaUpdate, MessageResponse
 
@@ -10,9 +23,8 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# TODO: 2회차에서 아래 메모리 저장소를 SQLite로 교체합니다.
-ideas: dict[int, IdeaResponse] = {}
-next_id = 1
+Base.metadata.create_all(bind=engine)
+DB = Annotated[Session, Depends(get_db)]
 
 
 @app.get("/", tags=["기본"])
@@ -31,48 +43,54 @@ def health() -> dict[str, str]:
     status_code=status.HTTP_201_CREATED,
     tags=["아이디어"],
 )
-def create_idea(payload: IdeaCreate) -> IdeaResponse:
-    global next_id
+def create_idea(payload: IdeaCreate, db: DB) -> IdeaResponse:
+    idea = Idea(**payload.model_dump())
+    
+    db.add(idea)
+    db.commit()
+    db.refresh(idea)
 
-    idea = IdeaResponse(
-        id=next_id,
-        created_at=datetime.now(UTC),
-        **payload.model_dump(),
-    )
-    ideas[next_id] = idea
-    next_id += 1
     return idea
 
 
 @app.get("/ideas", response_model=list[IdeaResponse], tags=["아이디어"])
 def list_ideas(
+    db: DB,
     keyword: str | None = Query(default=None, min_length=1, max_length=50),
 ) -> list[IdeaResponse]:
-    result = list(ideas.values())
+    statement = select(Idea).order_by(Idea.id.desc())
+    
     if keyword:
-        lowered = keyword.lower()
-        result = [idea for idea in result if lowered in idea.title.lower()]
-    return result
+        statement = statement.where(Idea.title.contains(keyword))
+    
+    return list(db.scalars(statement).all())
 
 
 @app.get("/ideas/{idea_id}", response_model=IdeaResponse, tags=["아이디어"])
-def get_idea(idea_id: int) -> IdeaResponse:
-    idea = ideas.get(idea_id)
+def get_idea(idea_id: int, db: DB) -> IdeaResponse:
+    idea = db.get(Idea, idea_id)
+    
     if idea is None:
         raise HTTPException(status_code=404, detail="아이디어를 찾을 수 없습니다.")
     return idea
 
 
 @app.patch("/ideas/{idea_id}", response_model=IdeaResponse, tags=["아이디어"])
-def update_idea(idea_id: int, payload: IdeaUpdate) -> IdeaResponse:
-    idea = ideas.get(idea_id)
+def update_idea(idea_id: int, payload: IdeaUpdate, db: DB) -> IdeaResponse:
+    idea = db.get(Idea, idea_id)
+    
     if idea is None:
         raise HTTPException(status_code=404, detail="아이디어를 찾을 수 없습니다.")
-
-    updated = idea.model_copy(update=payload.model_dump(exclude_unset=True))
-    ideas[idea_id] = updated
-    return updated
-
+    
+    changes = payload.model_dump(exclude_unset=True)
+    
+    for field, value in changes.items():
+        setattr(idea, field, value)
+    
+    db.commit()
+    db.refresh(idea)
+    
+    return idea
 
 @app.delete(
     "/ideas/{idea_id}",
