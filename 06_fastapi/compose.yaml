@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/ideas.db
+      UPSTAGE_API_KEY: ${UPSTAGE_API_KEY:-}
+      UPSTAGE_MODEL: ${UPSTAGE_MODEL:-solar-pro3}
+    volumes:
+      - ./app:/code/app
+      - idea-data:/data
+    command: fastapi dev app/main.py --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
+volumes:
+  idea-data:

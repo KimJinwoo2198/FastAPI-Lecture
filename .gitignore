@@ -7,3 +7,4 @@ __pycache__/
 .env
 *.db
 05_fastapi/complete/
+06_fastapi/complete/
