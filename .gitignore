@@ -8,3 +8,4 @@ __pycache__/
 *.db
 05_fastapi/complete/
 06_fastapi/complete/
+06_fastapi/LECTURE_SCRIPT.md
